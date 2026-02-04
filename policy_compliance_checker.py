@@ -19,11 +19,11 @@ Requirements:
 7. Severity levels: Critical, High, Medium, Low
 
 Output Format (JSON):
-{
+{{
   "issues": ["issue1", "issue2"],
   "severity": ["Critical", "Medium"],
   "recommendations": ["recommendation1", "recommendation2"]
-}
+}}
 
 Important: Base all suggestions on the provided context. Do not make up compliance rules."""),
     ("human", "Review the following HR policy text:\n\n{policy_text}")
@@ -40,16 +40,21 @@ def check_policy_compliance(policy_text):
         dict: JSON object with issues, severity, and recommendations
     """
     try:
-        # Format the prompt with the policy text
-        formatted_prompt = prompt_template.format(policy_text=policy_text)
-        
-        # Invoke the LLM
-        response = llm.invoke(formatted_prompt)
+        # Invoke the LLM with the prompt template
+        response = llm.invoke(prompt_template.format_messages(policy_text=policy_text))
         
         # Try to parse the response as JSON
         try:
-            result = json.loads(response.content)
-            return result
+            # Extract JSON from response
+            content = response.content
+            start_idx = content.find('{')
+            end_idx = content.rfind('}') + 1
+            if start_idx != -1 and end_idx > start_idx:
+                json_str = content[start_idx:end_idx]
+                result = json.loads(json_str)
+                return result
+            else:
+                raise json.JSONDecodeError("No JSON found", content, 0)
         except json.JSONDecodeError:
             # If response is not valid JSON, return it as-is with a note
             return {
