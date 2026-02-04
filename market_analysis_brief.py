@@ -18,21 +18,21 @@ Requirements:
 6. Output in JSON format with keys: SWOT, trends, citations, narrative_summary
 
 Output Format (JSON):
-{
-  "SWOT": {
+{{
+  "SWOT": {{
     "strengths": ["strength1", "strength2"],
     "weaknesses": ["weakness1", "weakness2"],
     "opportunities": ["opportunity1", "opportunity2"],
     "threats": ["threat1", "threat2"]
-  },
+  }},
   "trends": [
-    {"trend": "Trend description", "citation": "Source reference"},
-    {"trend": "Trend description", "citation": "Source reference"},
-    {"trend": "Trend description", "citation": "Source reference"}
+    {{"trend": "Trend description", "citation": "Source reference"}},
+    {{"trend": "Trend description", "citation": "Source reference"}},
+    {{"trend": "Trend description", "citation": "Source reference"}}
   ],
   "citations": ["Source 1", "Source 2", "Source 3"],
   "narrative_summary": "Comprehensive summary text..."
-}
+}}
 
 Important: Base all analysis on the provided documents. Do not invent data or trends."""),
     ("human", "Generate a market analysis brief from the following documents:\n\n{documents}")
@@ -49,18 +49,24 @@ def generate_market_analysis(documents):
         dict: JSON object with SWOT, trends, citations, and narrative summary
     """
     try:
-        # Format the prompt with the documents
-        formatted_prompt = prompt_template.format(documents=documents)
-        
-        # Invoke the LLM
-        response = llm.invoke(formatted_prompt)
+        # Invoke the LLM with the prompt template
+        response = llm.invoke(prompt_template.format_messages(documents=documents))
         
         # Try to parse the response as JSON
         try:
-            result = json.loads(response.content)
-            return result
-        except json.JSONDecodeError:
-            # If response is not valid JSON, return structured error
+            # Try to extract JSON from the response
+            content = response.content
+            # Find JSON object in the response
+            start_idx = content.find('{')
+            end_idx = content.rfind('}') + 1
+            if start_idx != -1 and end_idx > start_idx:
+                json_str = content[start_idx:end_idx]
+                result = json.loads(json_str)
+                return result
+            else:
+                raise json.JSONDecodeError("No JSON found", content, 0)
+        except json.JSONDecodeError as e:
+            # If response is not valid JSON, return the raw response
             return {
                 "SWOT": {
                     "strengths": [],
@@ -70,7 +76,8 @@ def generate_market_analysis(documents):
                 },
                 "trends": [],
                 "citations": [],
-                "narrative_summary": response.content
+                "narrative_summary": response.content,
+                "error": f"JSON parse error: {str(e)}"
             }
     except Exception as e:
         return {
